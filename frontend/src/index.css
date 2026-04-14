@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Leaflet divIcon: remove default tile background behind custom truck SVG */
+.truck-leaflet-icon {
+  background: transparent !important;
+  border: none !important;
+  transition: transform 3.0s linear !important; 
+}
