@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export default function DriverTruckEntry() {
   const [truckId, setTruckId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,7 @@ export default function DriverTruckEntry() {
     setError('');
 
     try {
-      await axios.post('/api/deliveries/driver/truck', { truckId });
+      await axios.post(`${API}/api/deliveries/driver/truck`, { truckId });
       navigate(`/driver/dashboard/${truckId}`);
     } catch (err) {
       console.error(err);

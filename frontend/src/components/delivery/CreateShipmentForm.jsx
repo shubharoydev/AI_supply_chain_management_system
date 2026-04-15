@@ -2,6 +2,8 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useUser } from '../../contexts/UserContext';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export default function CreateShipmentForm({ onSuccess }) {
   const { accessToken } = useUser();
   const [form, setForm] = useState({
@@ -32,7 +34,7 @@ export default function CreateShipmentForm({ onSuccess }) {
         cargoValue: Number(form.cargoValue),
       };
 
-      const res = await axios.post('/api/deliveries', payload);
+      const res = await axios.post(`${API}/api/deliveries`, payload);
       const delivery = res.data.delivery;
       onSuccess(delivery);
       setNotice({

@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 const UserContext = createContext();
 
 export function UserProvider({ children }) {
@@ -38,7 +40,7 @@ export function UserProvider({ children }) {
           originalRequest._retry = true;
 
           try {
-            const response = await axios.post('/api/auth/refresh', {
+            const response = await axios.post(`${API}/api/auth/refresh`, {
               refreshToken: refreshToken
             });
 
@@ -70,7 +72,7 @@ export function UserProvider({ children }) {
   useEffect(() => {
     if (accessToken) {
       // Fetch user profile
-      axios.get('/api/auth/me')
+      axios.get(`${API}/api/auth/me`)
         .then(res => setUser(res.data))
         .catch(() => logout())
         .finally(() => setLoading(false));
@@ -96,7 +98,7 @@ export function UserProvider({ children }) {
     
     // Call logout endpoint to invalidate refresh token
     if (refreshToken) {
-      axios.post('/api/auth/logout', { refreshToken }).catch(() => {});
+      axios.post(`${API}/api/auth/logout`, { refreshToken }).catch(() => {});
     }
   };
 

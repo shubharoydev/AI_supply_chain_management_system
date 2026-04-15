@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import axios from 'axios';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export default function Login() {
   const { login } = useUser();
   const navigate = useNavigate();
@@ -26,7 +28,7 @@ export default function Login() {
     setError('');
 
     try {
-      const { data } = await axios.post('/api/auth/login', formData);
+      const { data } = await axios.post(`${API}/api/auth/login`, formData);
       login(data.accessToken, data.refreshToken, data.user);
       if (data.user?.role === 'driver') {
         navigate('/driver/truck-entry');

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export default function Signup() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -36,7 +38,7 @@ export default function Signup() {
 
     try {
       const { confirmPassword, ...registerData } = formData;
-      await axios.post('/api/auth/register', registerData);
+      await axios.post(`${API}/api/auth/register`, registerData);
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');

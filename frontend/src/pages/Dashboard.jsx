@@ -9,6 +9,8 @@ import Navbar from '../components/Layout/Navbar';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import useSocket from '../hooks/useSocket';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export default function Dashboard() {
   const { accessToken } = useUser();
   const socket = useSocket();
@@ -32,7 +34,7 @@ export default function Dashboard() {
     try {
       if (isInitial) setLoading(true);
       setError(null);
-      const res = await axios.get('/api/deliveries');
+      const res = await axios.get(`${API}/api/deliveries`);
       const incoming = Array.isArray(res.data) ? res.data : [];
       setShipments((prev) => {
         const prevById = new Map(prev.map((s) => [String(s._id), s]));

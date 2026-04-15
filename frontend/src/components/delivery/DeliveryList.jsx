@@ -2,6 +2,8 @@ import { useState } from 'react';
 import axios from 'axios';
 import { Truck, Clock, AlertTriangle, CheckCircle, Play } from 'lucide-react';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 const statusLabel = (s) => {
   switch (s) {
     case 'pending':
@@ -33,7 +35,7 @@ export default function DeliveryList({ shipments = [], onSelect, onRefresh }) {
     e?.stopPropagation();
     setStarting((s) => ({ ...s, [id]: true }));
     try {
-      await axios.post(`/api/deliveries/${id}/start`);
+      await axios.post(`${API}/api/deliveries/${id}/start`);
       await onRefresh?.();
     } catch (err) {
       window.alert(err.response?.data?.error || 'Failed to start delivery');
@@ -175,7 +177,7 @@ export default function DeliveryList({ shipments = [], onSelect, onRefresh }) {
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
-                          await axios.post(`/api/deliveries/${shipment._id}/stop`);
+                          await axios.post(`${API}/api/deliveries/${shipment._id}/stop`);
                           onRefresh?.();
                         } catch (err) {
                            console.error('Failed to stop simulation:', err);
@@ -194,7 +196,7 @@ export default function DeliveryList({ shipments = [], onSelect, onRefresh }) {
                       e.stopPropagation();
                       if (window.confirm('Delete this shipment?')) {
                         try {
-                          await axios.delete(`/api/deliveries/${shipment._id}`);
+                          await axios.delete(`${API}/api/deliveries/${shipment._id}`);
                           onRefresh?.();
                         } catch (err) {
                           console.error('Failed to delete shipment:', err);

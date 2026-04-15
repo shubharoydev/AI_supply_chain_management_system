@@ -6,6 +6,8 @@ import useSocket from '../hooks/useSocket';
 import LiveMap from '../components/map/LiveMap';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export default function DriverDashboard() {
   const { truckId } = useParams();
   const navigate = useNavigate();
@@ -27,7 +29,7 @@ export default function DriverDashboard() {
   const fetchShipment = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.post('/api/deliveries/driver/truck', { truckId });
+      const res = await axios.post(`${API}/api/deliveries/driver/truck`, { truckId });
       setShipment(res.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load dashboard. Ensure truck is active.');

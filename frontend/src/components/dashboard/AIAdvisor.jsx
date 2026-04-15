@@ -2,6 +2,8 @@ import { useState } from 'react';
 import axios from 'axios';
 import { Bot, Sparkles, AlertTriangle, Send } from 'lucide-react';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export default function AIAdvisor() {
   const [briefing, setBriefing] = useState('');
   const [loadingBriefing, setLoadingBriefing] = useState(false);
@@ -12,7 +14,7 @@ export default function AIAdvisor() {
   const fetchBriefing = async () => {
     setLoadingBriefing(true);
     try {
-      const res = await axios.get('/api/advisory/briefing');
+      const res = await axios.get(`${API}/api/advisory/briefing`);
       setBriefing(res.data.briefing);
     } catch (err) {
       console.error(err);
@@ -32,7 +34,7 @@ export default function AIAdvisor() {
     setAsking(true);
 
     try {
-      const res = await axios.post('/api/advisory/ask', { question: userQ });
+      const res = await axios.post(`${API}/api/advisory/ask`, { question: userQ });
       setChatLog((prev) => [...prev, { role: 'ai', text: res.data.answer }]);
     } catch (err) {
       console.error(err);
