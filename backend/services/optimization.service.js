@@ -11,14 +11,14 @@ import { persistSocketEvent } from './socketsDb.service.js';
 async function acquireRerouteCooldown(deliveryId) {
   const id = String(deliveryId);
   const key = `cooldown:reroute:${id}`;
-  const ttlSeconds = 15 * 60;
+  const ttlSeconds = 5 * 60; // 5 minutes standard cooldown so it doesn't loop
   try {
-    // SET key value NX EX ttl
-    const ok = await redis.set(key, String(Date.now()), 'NX', 'EX', ttlSeconds);
+    // Correct ioredis syntax for EX and NX
+    const ok = await redis.set(key, String(Date.now()), 'EX', ttlSeconds, 'NX');
     return ok === 'OK';
-  } catch {
-    // If Redis is unavailable, fail open (still allow reroute) rather than deadlock.
-    return true;
+  } catch (err) {
+    console.error('Redis lock error:', err);
+    return false; // Fail closed to prevent catastrophic API/simulation loop
   }
 }
 
