@@ -43,6 +43,34 @@ export default function Dashboard() {
           const cur = prevById.get(id);
           if (!cur) return next;
 
+          // IMPORTANT: If reroute was already applied, NEVER overwrite routes from polling
+          // This prevents the visual switching between routes
+          const rerouteApplied = cur.rerouteIsApplied || cur.originalRoute?.length > 1;
+          
+          if (rerouteApplied) {
+            console.log(`[Polling] Preserving reroute state for ${id} - rerouteIsApplied:${cur.rerouteIsApplied} originalRoute.length:${cur.originalRoute?.length}`);
+            // Keep all route data from current state, only update non-route fields
+            return {
+              ...next,
+              optimizedRoute: cur.optimizedRoute,
+              originalRoute: cur.originalRoute,
+              rerouteRoute: cur.rerouteRoute,
+              rerouteSwitchIndex: cur.rerouteSwitchIndex,
+              lastReroutedAt: cur.lastReroutedAt,
+              rerouteIsApplied: true,
+              // Preserve live movement fields (socket/sim) over slower polling.
+              currentLocation: cur.currentLocation || next.currentLocation,
+              routeProgressIndex: Number.isFinite(cur.routeProgressIndex) ? cur.routeProgressIndex : next.routeProgressIndex,
+              riskScore: Number.isFinite(cur.riskScore) ? cur.riskScore : next.riskScore,
+              delayPrediction: {
+                ...(next.delayPrediction || {}),
+                ...(cur.delayPrediction || {}),
+              },
+              ETA: cur.ETA || next.ETA,
+              __sim: cur.__sim,
+            };
+          }
+
           // Preserve socket/reroute updates that aren't persisted in DB yet.
           const curRerouteAt = cur.lastReroutedAt ? new Date(cur.lastReroutedAt).getTime() : 0;
           const nextRerouteAt = next.lastReroutedAt ? new Date(next.lastReroutedAt).getTime() : 0;
@@ -309,18 +337,49 @@ export default function Dashboard() {
           String(s._id) === String(id)
             ? {
               ...s,
-              optimizedRoute: data.optimizedRoute ?? s.optimizedRoute,
-              rerouteRoute: data.rerouteRoute ?? s.rerouteRoute,
-              rerouteSwitchIndex: Number.isFinite(data.rerouteSwitchIndex)
-                ? data.rerouteSwitchIndex
-                : s.rerouteSwitchIndex,
-              originalRoute: data.originalRoute || s.originalRoute,
-              // Ensure the marker stays "on" the active route for demo purposes.
-              currentLocation:
-                s.currentLocation ||
-                (data.optimizedRoute ? data.optimizedRoute?.[data.applied ? 0 : (s.routeProgressIndex ?? 0)] : undefined) ||
-                data.optimizedRoute?.[0],
-              routeProgressIndex: data.applied ? 0 : Math.max(
+              // Allow route updates if data.applied is true (reroute just applied in backend)
+              // Otherwise, if reroute was already applied, prevent further changes
+              ...(s.originalRoute?.length > 1 || s.rerouteIsApplied
+                ? (data.applied
+                    ? {
+                        // Accept the applied reroute
+                        optimizedRoute: (data.optimizedRoute && Array.isArray(data.optimizedRoute) && data.optimizedRoute.length > 1)
+                          ? data.optimizedRoute
+                          : s.optimizedRoute,
+                        originalRoute: (data.originalRoute && Array.isArray(data.originalRoute) && data.originalRoute.length > 1)
+                          ? data.originalRoute
+                          : s.originalRoute,
+                        rerouteRoute: data.rerouteRoute ?? s.rerouteRoute,
+                        rerouteSwitchIndex: data.rerouteSwitchIndex ?? s.rerouteSwitchIndex,
+                        rerouteIsApplied: true,
+                      }
+                    : {
+                        // Keep existing routes, don't accept any changes
+                        optimizedRoute: s.optimizedRoute,
+                        originalRoute: s.originalRoute,
+                        rerouteRoute: s.rerouteRoute,
+                        rerouteSwitchIndex: s.rerouteSwitchIndex,
+                        rerouteIsApplied: true,
+                      })
+                : {
+                    // Only update routes if new data is provided and valid
+                    optimizedRoute: (data.optimizedRoute && Array.isArray(data.optimizedRoute) && data.optimizedRoute.length > 1)
+                      ? data.optimizedRoute
+                      : s.optimizedRoute,
+                    rerouteRoute: (data.rerouteRoute && Array.isArray(data.rerouteRoute) && data.rerouteRoute.length > 1)
+                      ? data.rerouteRoute
+                      : s.rerouteRoute,
+                    rerouteSwitchIndex: Number.isFinite(data.rerouteSwitchIndex)
+                      ? data.rerouteSwitchIndex
+                      : s.rerouteSwitchIndex,
+                    originalRoute: (data.originalRoute && Array.isArray(data.originalRoute) && data.originalRoute.length > 1)
+                      ? data.originalRoute
+                      : s.originalRoute,
+                  }),
+              // Preserve current location and progress when reroute is applied
+              // The reroute route already starts from current location
+              currentLocation: s.currentLocation || data.currentLocation,
+              routeProgressIndex: Math.max(
                 0,
                 Math.min(s.routeProgressIndex ?? 0, ((data.optimizedRoute ?? s.optimizedRoute)?.length || 1) - 1)
               ),

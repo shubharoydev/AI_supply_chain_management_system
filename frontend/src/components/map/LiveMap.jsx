@@ -152,8 +152,8 @@ export default function LiveMap({ shipments = [] }) {
                 </Source>
               )}
 
-              {/* Previous route (grey dashed) */}
-              {originalPath.length > 1 && (
+              {/* Previous route (grey dashed) - only show if reroute not yet applied */}
+              {originalPath.length > 1 && !s.rerouteIsApplied && (
                 <Source id={`orig-${shipmentId}`} type="geojson" data={originalGeoJson}>
                   <Layer
                     id={`layer-orig-${shipmentId}`}

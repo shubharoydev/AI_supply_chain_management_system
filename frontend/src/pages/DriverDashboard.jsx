@@ -103,14 +103,45 @@ export default function DriverDashboard() {
       if (String(data.deliveryId) === String(shipment._id)) {
         setShipment(prev => ({
           ...prev,
-          optimizedRoute: data.optimizedRoute ?? prev.optimizedRoute,
-          rerouteRoute: data.rerouteRoute ?? prev.rerouteRoute,
-          rerouteSwitchIndex: Number.isFinite(data.rerouteSwitchIndex) ? data.rerouteSwitchIndex : prev.rerouteSwitchIndex,
-          originalRoute: data.originalRoute ?? prev.originalRoute,
-          currentLocation:
-            prev.currentLocation ||
-            (data.optimizedRoute ? data.optimizedRoute?.[prev.routeProgressIndex ?? 0] : undefined) ||
-            data.optimizedRoute?.[0],
+          // Allow route updates if data.applied is true (reroute just applied in backend)
+          // Otherwise, if reroute was already applied, prevent further changes
+          ...(prev.originalRoute?.length > 1 || prev.rerouteIsApplied
+            ? (data.applied
+                ? {
+                    // Accept the applied reroute
+                    optimizedRoute: (data.optimizedRoute && Array.isArray(data.optimizedRoute) && data.optimizedRoute.length > 1)
+                      ? data.optimizedRoute
+                      : prev.optimizedRoute,
+                    originalRoute: (data.originalRoute && Array.isArray(data.originalRoute) && data.originalRoute.length > 1)
+                      ? data.originalRoute
+                      : prev.originalRoute,
+                    rerouteRoute: data.rerouteRoute ?? prev.rerouteRoute,
+                    rerouteSwitchIndex: data.rerouteSwitchIndex ?? prev.rerouteSwitchIndex,
+                    rerouteIsApplied: true,
+                  }
+                : {
+                    // Keep existing routes, don't accept any changes
+                    optimizedRoute: prev.optimizedRoute,
+                    originalRoute: prev.originalRoute,
+                    rerouteRoute: prev.rerouteRoute,
+                    rerouteSwitchIndex: prev.rerouteSwitchIndex,
+                    rerouteIsApplied: true,
+                  })
+            : {
+                // Only update routes if new data is provided and valid
+                optimizedRoute: (data.optimizedRoute && Array.isArray(data.optimizedRoute) && data.optimizedRoute.length > 1)
+                  ? data.optimizedRoute
+                  : prev.optimizedRoute,
+                rerouteRoute: (data.rerouteRoute && Array.isArray(data.rerouteRoute) && data.rerouteRoute.length > 1)
+                  ? data.rerouteRoute
+                  : prev.rerouteRoute,
+                rerouteSwitchIndex: Number.isFinite(data.rerouteSwitchIndex) ? data.rerouteSwitchIndex : prev.rerouteSwitchIndex,
+                originalRoute: (data.originalRoute && Array.isArray(data.originalRoute) && data.originalRoute.length > 1)
+                  ? data.originalRoute
+                  : prev.originalRoute,
+              }),
+          // Preserve current location and progress when reroute is applied
+          currentLocation: prev.currentLocation || data.currentLocation,
           routeProgressIndex: Math.max(
             0,
             Math.min(prev.routeProgressIndex ?? 0, ((data.optimizedRoute ?? prev.optimizedRoute)?.length || 1) - 1)

@@ -52,11 +52,21 @@ export async function optimizeAndReRoute(deliveryId, obstacles = []) {
     return { reRouted: false, reason: 'cooldown' };
   }
 
+  const id = String(deliveryId);
+  const key = `sim:${id}:state`;
+  const cached = await redis.get(key);
+  let state = cached ? JSON.parse(cached) : null;
+
+  if (!state) {
+    return { reRouted: false, reason: 'no_state' };
+  }
+
+  // Prevent rerouting if one was already applied
+  if (state.rerouteIsApplied) {
+    return { reRouted: false, reason: 'already_rerouted' };
+  }
+
   const doc = await Delivery.findById(deliveryId);
-  const key = `sim:${deliveryId}:state`;
-  const cachedStr = await redis.get(key);
-  if (!doc && !cachedStr) return { reRouted: false };
-  const state = cachedStr ? JSON.parse(cachedStr) : doc.toObject();
   const deliveryIdStr = String(state?._id || doc?._id || deliveryId);
   const truckId = state?.truckId || doc?.truckId;
 
@@ -147,6 +157,7 @@ export async function optimizeAndReRoute(deliveryId, obstacles = []) {
     state.rerouteRoute = merged;
     state.rerouteSwitchIndex = (state.routeProgressIndex ?? 0) + lookahead;
     state.rerouteIsCut = true; // Signal simulation tick to reset tracking index
+    // NOTE: rerouteIsApplied will be set to true only when the reroute is actually APPLIED in simulation tick
 
     state.activeObstacles = obs;
     state.lastReroutedAt = new Date();
@@ -185,6 +196,28 @@ export async function optimizeAndReRoute(deliveryId, obstacles = []) {
 export async function handleRiskFromPrediction(deliveryId, prediction) {
   const threshold = Number(config.riskScoreThreshold) || 70;
   const highRisk = prediction.risk_score >= threshold;
+
+  // Early exit: check if a reroute was recently applied BEFORE doing any work
+  const key = `sim:${deliveryId}:state`;
+  const cachedStr = await redis.get(key);
+  if (cachedStr) {
+    const state = JSON.parse(cachedStr);
+    // If rerouteIsApplied is true, skip entirely - no more reroutes for this delivery
+    if (state.rerouteIsApplied) {
+      return { alerted: false, rerouteSkipped: 'already_rerouted' };
+    }
+    if (state.lastReroutedAt) {
+      const lastRerouteTime = new Date(state.lastReroutedAt).getTime();
+      const now = Date.now();
+      const timeSinceReroute = (now - lastRerouteTime) / 1000; // in seconds
+      // Skip entirely if a reroute was applied within the last 5 minutes
+      if (timeSinceReroute < 300) {
+        return { alerted: false, rerouteSkipped: 'recent_reroute' };
+      }
+    }
+  }
+
+  // Only log if we're actually going to process (not skipping)
   console.log(`[AI-Risk] ID:${deliveryId} Risk:${prediction.risk_score}% Threshold:${threshold}%`);
 
   if (!highRisk) {

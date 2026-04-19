@@ -61,7 +61,7 @@ async function getSimulationState(deliveryId) {
 }
 
 async function tick(deliveryId) {
-  const state = await getSimulationState(deliveryId);
+  let state = await getSimulationState(deliveryId);
   if (!state || state.status === 'delivered') {
     stopSimulation(deliveryId);
     return;
@@ -81,9 +81,12 @@ async function tick(deliveryId) {
   // If a reroute has been staged, switch only when we reach a safe point.
   // This avoids the marker "teleporting" and matches the simulation requirement:
   // show reroute in grey first, then switch when the truck gets a chance.
-  if (Array.isArray(state.rerouteRoute) && state.rerouteRoute.length > 1) {
+  // IMPORTANT: Only switch if rerouteIsApplied is not already true (prevent repeated application)
+  if (Array.isArray(state.rerouteRoute) && state.rerouteRoute.length > 1 && !state.rerouteIsApplied) {
     const switchAt = Number.isFinite(state.rerouteSwitchIndex) ? state.rerouteSwitchIndex : idx;
+    console.log(`[Reroute Switch] Delivery:${deliveryId} idx:${idx} switchAt:${switchAt} shouldSwitch:${idx >= switchAt} rerouteIsApplied:${state.rerouteIsApplied}`);
     if (idx >= switchAt) {
+      console.log(`[Reroute Switch] APPLYING reroute for delivery ${deliveryId} - setting rerouteIsApplied=true`);
       const prevRoute = state.optimizedRoute;
       state.originalRoute = Array.isArray(state.originalRoute) && state.originalRoute.length
         ? state.originalRoute
@@ -92,20 +95,21 @@ async function tick(deliveryId) {
       state.rerouteRoute = null;
       state.rerouteSwitchIndex = null;
       state.lastReroutedAt = new Date();
+      state.rerouteIsApplied = true; // Mark as applied to prevent any further switches
 
       route = state.optimizedRoute || [];
-      if (state.rerouteIsCut) {
-        idx = 0;
-        state.rerouteIsCut = false;
-      } else {
-        idx = Math.min(idx, Math.max(0, route.length - 1));
-      }
+      // Don't reset idx - the reroute route already starts from current location
+      // Just ensure idx is within bounds of the new route
+      idx = Math.min(idx, Math.max(0, route.length - 1));
+      state.rerouteIsCut = false;
 
       io.emit('route-updated', {
         deliveryId: state._id.toString(),
         truckId: state.truckId,
         optimizedRoute: state.optimizedRoute,
         originalRoute: state.originalRoute,
+        rerouteRoute: null, // Explicitly send null to clear frontend reroute
+        rerouteSwitchIndex: null,
         reRouted: true,
         applied: true,
         timestamp: new Date().toISOString(),
@@ -119,6 +123,10 @@ async function tick(deliveryId) {
         applied: true,
         timestamp: new Date().toISOString(),
       });
+
+      // CRITICAL: Save state to Redis immediately after applying reroute
+      // This ensures rerouteIsApplied flag persists and prevents re-staging
+      await redis.setex(`sim:${deliveryId}:state`, 60 * 60, JSON.stringify(state));
     }
   }
 
@@ -248,8 +256,12 @@ async function tick(deliveryId) {
     }
     // CRITICAL: optimization.service.js may have just re-routed and written new state to Redis!
     // We must refresh our local state variable before applying updates, otherwise we overwrite the re-route!
-    const refreshedStateRaw = await redis.get(`sim:${deliveryId}:state`);
-    if (refreshedStateRaw) Object.assign(state, JSON.parse(refreshedStateRaw));
+    const refreshed = await redis.get(`sim:${deliveryId}:state`);
+    if (refreshed) {
+      const oldRerouteApplied = state.rerouteIsApplied;
+      state = JSON.parse(refreshed);
+      console.log(`[Sim] Refreshed state from Redis for ${deliveryId} - rerouteIsApplied: ${oldRerouteApplied} -> ${state.rerouteIsApplied}`);
+    }
   } else {
     // Just update at-risk status if needed
     if (state.status === 'at-risk' || state.status === 'delayed') {
